@@ -17,7 +17,6 @@ from totalsegmentator.config import get_config_key, set_config_key
 from totalsegmentator.config import send_usage_stats, set_license_number
 from totalsegmentator.config import setup_nnunet, setup_totalseg, increase_prediction_counter
 from totalsegmentator.cropping import crop_to_mask, undo_crop
-from totalsegmentator.dicom_io import dcm_to_nifti, save_mask_as_rtstruct
 from totalsegmentator.libs import combine_masks, check_if_shape_and_affine_identical, \
     reorder_multilabel_like_v1
 from totalsegmentator.libs import download_pretrained_weights
@@ -33,7 +32,7 @@ from totalsegmentator.postprocessing import extract_skin, remove_auxiliary_label
 from totalsegmentator.postprocessing import keep_largest_blob_multilabel, remove_small_blobs_multilabel
 from totalsegmentator.python_api import validate_device_type_api, convert_device_to_cuda, show_license_info
 from totalsegmentator.resampling import change_spacing
-from totalsegmentator.statistics import get_basic_statistics, get_radiomics_features_for_entire_dir
+
 import inspect
 
 def save_segmentation_nifti(class_map_item, tmp_dir=None, file_out=None, nora_tag=None, header=None, task_name=None, quiet=None):
@@ -235,6 +234,7 @@ class TotalSegmentatorBatch:
             if verbose: print(f"tmp_dir: {tmp_dir}")
 
             if img_type == "dicom":
+                from totalsegmentator.dicom_io import dcm_to_nifti, save_mask_as_rtstruct
                 if not quiet: print("Converting dicom to nifti...")
                 (tmp_dir / "dcm").mkdir()  # make subdir otherwise this file would be included by nnUNet_predict
                 dcm_to_nifti(file_in, tmp_dir / "dcm" / "converted_dcm.nii.gz", tmp_dir, verbose=verbose)
@@ -517,6 +517,7 @@ class TotalSegmentatorBatch:
                     stats_file = stats_dir / "statistics.json"
                 else:
                     stats_file = None
+                from totalsegmentator.statistics import get_basic_statistics
                 stats = get_basic_statistics(img_pred.get_fdata(), img_in_rsp, stats_file,
                                              quiet, task_name, exclude_masks_at_border, roi_subset,
                                              metric=stats_aggregation,
@@ -590,6 +591,7 @@ class TotalSegmentatorBatch:
                     selected_classes = {k: v for k, v in selected_classes.items() if v in roi_subset}
 
                 if output_type == "dicom":
+                    from totalsegmentator.dicom_io import dcm_to_nifti, save_mask_as_rtstruct
                     file_out.mkdir(exist_ok=True, parents=True)
                     save_mask_as_rtstruct(img_data, selected_classes, file_in_dcm, file_out / "segmentations.dcm")
                 else:
@@ -723,7 +725,7 @@ class TotalSegmentatorBatch:
         # verbose = self.verbose
         crop_path = output if crop_path is None else crop_path
 
-        if isinstance(input, Nifti1Image) or input.suffix == ".nii" or input.suffixes == [".nii", ".gz"]:
+        if isinstance(input, Nifti1Image) or input.suffix == ".nii" or input.suffixes[-2:] == [".nii", ".gz"]:
             img_type = "nifti"
         else:
             img_type = "dicom"
@@ -884,6 +886,7 @@ class TotalSegmentatorBatch:
                 stats_file = stats_dir / "statistics.json"
             else:
                 stats_file = None
+            from totalsegmentator.statistics import get_basic_statistics
             stats = get_basic_statistics(seg, ct_img, stats_file,
                                          quiet, task, statistics_exclude_masks_at_border,
                                          roi_subset,
@@ -906,6 +909,7 @@ class TotalSegmentatorBatch:
                     nib.save(input, input_path)
                 else:
                     input_path = input
+                from totalsegmentator.statistics import get_radiomics_features_for_entire_dir
                 get_radiomics_features_for_entire_dir(input_path, output, stats_dir / "statistics_radiomics.json")
                 if not quiet: print(f"  calculated in {time.time() - st:.2f}s")
 
@@ -1517,12 +1521,12 @@ class TotalSegmentatorBatch:
 
 if __name__ == '__main__':
     segmentor = TotalSegmentatorBatch()
-    segmentor.predict("/media/aicvi/Elements/CT/CT/ct_train/ct_train_1005_image.nii.gz",
-                      "/media/aicvi/Elements/CT/CT/ct_train/ct_train_1005_image_seg_2.nii.gz",
+    segmentor.predict("/media/aicvi/Elements/chest_12t/manifest-NLST_allCT/NLST/213271/01-02-2001-NLST-ACRIN-56817/4.000000-2OPAGELSULTSTANDARD2801.21206044.41.4-53357_nifti/4.000000-2OPAGELSULTSTANDARD2801.21206044.41.4-53357_20010102000000_2,OPA,GE,LSULT,STANDARD,280,1.2,120,60,44.4,1.4_4_2,OPA,GE,LSULT,STANDARD,280,1.2,120,60,44.4,1.4_213271_0_GE_2029156176125204.nii.gz",
+                      "/media/aicvi/Elements/chest_12t/manifest-NLST_allCT/NLST/213271/01-02-2001-NLST-ACRIN-56817/4.000000-2OPAGELSULTSTANDARD2801.21206044.41.4-53357_nifti/4.000000-2OPAGELSULTSTANDARD2801.21206044.41.4-53357_20010102000000_2,OPA,GE,LSULT,STANDARD,280,1.2,120,60,44.4,1.4_4_2,OPA,GE,LSULT,STANDARD,280,1.2,120,60,44.4,1.4_213271_0_GE_2029156176125204_seg.nii.gz",
                       ml=True)
-    segmentor.predict("/media/aicvi/Elements/CT/CT/ct_train/ct_train_1005_image.nii.gz",
-                      "/media/aicvi/Elements/CT/CT/ct_train/ct_train_1005_image_seg_2.nii.gz",
-                      ml=True)
+    # segmentor.predict("/media/aicvi/Elements/CT/CT/ct_train/ct_train_1005_image.nii.gz",
+    #                   "/media/aicvi/Elements/CT/CT/ct_train/ct_train_1005_image_seg_2.nii.gz",
+    #                   ml=True)
     # segmentor.predict("/media/aicvi/Elements/CT/CT/ct_train/ct_train_1005_image.nii.gz",
     #                   "/media/aicvi/Elements/CT/CT/ct_train/ct_train_1005_image_seg_2.nii.gz",
     #                   ml=True)

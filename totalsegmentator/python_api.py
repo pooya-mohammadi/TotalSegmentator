@@ -21,23 +21,30 @@ import re
 
 
 def validate_device_type_api(value):
-    valid_strings = ["gpu", "cpu", "mps"]
+    valid_strings = ["gpu", "cpu", "mps", "cuda"]
     if value in valid_strings:
         return value
 
     # Check if the value matches the pattern "gpu:X" where X is an integer
-    pattern = r"^gpu:(\d+)$"
-    match = re.match(pattern, value)
-    if match:
-        device_id = int(match.group(1))
-        return value
+    if value.startswith("gpu"):
+        pattern = r"^gpu:(\d+)$"
+        match = re.match(pattern, value)
+        if match:
+            device_id = int(match.group(1))
+            return value
+    elif value.startswith("cuda"):
+        pattern = r"^cuda:(\d+)$"
+        match = re.match(pattern, value)
+        if match:
+            device_id = int(match.group(1))
+            return value
 
     raise ValueError(
         f"Invalid device type: '{value}'. Must be 'gpu', 'cpu', 'mps', or 'gpu:X' where X is an integer representing the GPU device ID.")
 
 
 def convert_device_to_cuda(device):
-    if device in ["cpu", "mps", "gpu"]:
+    if device in ["cpu", "mps", "gpu", "cuda"]:
         return device
     else:  # gpu:X
         return f"cuda:{device.split(':')[1]}"
@@ -573,7 +580,7 @@ def totalsegmentator(input: Union[str, Path, Nifti1Image], output: Union[str, Pa
 
     crop_path = output if crop_path is None else crop_path
 
-    if isinstance(input, Nifti1Image) or input.suffix == ".nii" or input.suffixes == [".nii", ".gz"]:
+    if isinstance(input, Nifti1Image) or input.suffix == ".nii" or input.suffixes[-2:] == [".nii", ".gz"]:
         img_type = "nifti"
     else:
         img_type = "dicom"
